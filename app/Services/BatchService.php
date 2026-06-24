@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendMessageJob;
 use App\Models\Batch;
 use App\Repositories\BatchRepository;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +47,11 @@ class BatchService
 
             $batch = $this->batchRepository->createBatch($data, $requestHash);
 
-            $this->batchRepository->createMessages($batch, $data);
+            $messages = $this->batchRepository->createMessages($batch, $data);
+
+            foreach ($messages as $message) {
+                SendMessageJob::dispatch($message->id)->afterCommit();
+            }
 
             return $batch->loadCount('messages');
         });
