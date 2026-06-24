@@ -1,0 +1,173 @@
+services:
+    nginx:
+        build:
+            context: docker/base/nginx
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+        container_name: notification_nginx
+        restart: unless-stopped
+        ports:
+            - "${EXTERNAL_NGINX_PORT:-8080}:80"
+        volumes:
+            - .:/app
+        depends_on:
+            - backend
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    backend:
+        build:
+            context: docker/base/backend
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+            target: backend
+        container_name: notification_backend
+        environment:
+            CONTAINER_ROLE: backend
+        restart: unless-stopped
+        depends_on:
+            - pgsql
+            - redis
+            - kafka
+        volumes:
+            - .:/app
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    queue:
+        build:
+            context: docker/base/backend
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+            target: backend
+        container_name: notification_queue
+        environment:
+            CONTAINER_ROLE: queue
+        restart: unless-stopped
+        depends_on:
+            - backend
+            - kafka
+            - redis
+        volumes:
+            - .:/app
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    pgsql:
+        image: postgres:18
+        container_name: notification_postgres
+        restart: unless-stopped
+        ports:
+            - "${EXTERNAL_PGSQL_PORT:-5433}:5432"
+        environment:
+            POSTGRES_DB: ${DB_DATABASE}
+            POSTGRES_USER: ${DB_USERNAME}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - pgsql_data:/var/lib/postgresql
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    redis:
+        image: redis:7-alpine
+        container_name: notification_redis
+        restart: unless-stopped
+        ports:
+            - "${EXTERNAL_REDIS_PORT:-6380}:6379"
+        volumes:
+            - redis_data:/data
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    kafka:
+        image: confluentinc/cp-kafka:7.7.8
+        container_name: notification_kafka
+        restart: unless-stopped
+        ports:
+            - "9092:9092"
+        environment:
+            CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+            KAFKA_NODE_ID: 1
+            KAFKA_PROCESS_ROLES: broker,controller
+            KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+            KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+            KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+            KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+        volumes:
+            - kafka_data:/tmp/kraft-combined-logs
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    kafka-ui:
+        image: provectuslabs/kafka-ui:latest
+        container_name: notification_kafka_ui
+        restart: unless-stopped
+        ports:
+            - "${EXTERNAL_KAFKA_UI_PORT:-8081}:8080"
+        environment:
+            KAFKA_CLUSTERS_0_NAME: notification-local
+            KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+        depends_on:
+            - kafka
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    mailhog:
+        image: mailhog/mailhog
+        container_name: notification_mailhog
+        restart: unless-stopped
+        ports:
+            - "${EXTERNAL_MAILHOG_SMTP_PORT:-1025}:1025"
+            - "${EXTERNAL_MAILHOG_UI_PORT:-8025}:8025"
+        networks:
+            - notification_network
+
+volumes:
+    pgsql_data:
+    redis_data:
+    kafka_data:
+
+networks:
+    notification_network:
+        driver: bridge
