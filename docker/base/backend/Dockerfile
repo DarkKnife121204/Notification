@@ -10,11 +10,13 @@ RUN set -ex && \
         $PHPIZE_DEPS \
         icu-dev \
         libzip-dev \
-        postgresql-dev && \
+        postgresql-dev \
+        librdkafka-dev && \
     apk add --no-cache \
         icu \
         libzip \
         libpq \
+        librdkafka \
         dos2unix \
         curl && \
     docker-php-ext-install \
@@ -23,6 +25,8 @@ RUN set -ex && \
         opcache \
         pdo_pgsql \
         zip && \
+    pecl install rdkafka redis && \
+    docker-php-ext-enable rdkafka redis && \
     apk del .build-deps && \
     docker-php-source delete && \
     rm -rf /var/cache/apk/* /tmp/pear

@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
-use App\Jobs\SendMessageJob;
 use App\Models\Batch;
 use App\Repositories\BatchRepository;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Junges\Kafka\Facades\Kafka;
 
 class BatchService
 {
@@ -39,7 +38,9 @@ class BatchService
 
             if ($existingBatch) {
                 if ($existingBatch->request_hash !== $requestHash) {
-                    abort(409, 'Конфликт повтора');
+                    abort(response()->json([
+                        'message' => 'Конфликт повтора'
+                    ], 409));
                 }
 
                 return $existingBatch->loadCount('messages');
@@ -49,9 +50,16 @@ class BatchService
 
             $messages = $this->batchRepository->createMessages($batch, $data);
 
-            foreach ($messages as $message) {
-                SendMessageJob::dispatch($message->id)->afterCommit();
-            }
+            DB::afterCommit(function () use ($messages) {
+                foreach ($messages as $message) {
+                    Kafka::publish()
+                        ->onTopic(config('kafka.topics.notifications'))
+                        ->withBody([
+                            'message_id' => $message->id,
+                        ])
+                        ->send();
+                }
+            });
 
             return $batch->loadCount('messages');
         });

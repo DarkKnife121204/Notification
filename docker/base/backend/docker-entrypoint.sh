@@ -3,10 +3,16 @@
 role=${CONTAINER_ROLE:-backend}
 
 if [ "$role" = "backend" ]; then
+    php /app/artisan migrate --force
+
+    if [ "$RUN_SEEDER" = "true" ]; then
+        php /app/artisan db:seed --force
+    fi
+
     exec php-fpm --nodaemonize
 
-elif [ "$role" = "queue" ]; then
-    php /app/artisan queue:work --verbose --tries=3 --timeout=120 --sleep=3
+elif [ "$role" = "kafka-consumer" ]; then
+    php /app/artisan kafka:consume-messages
 
 else
     echo "Could not match the container role: $role"

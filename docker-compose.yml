@@ -32,36 +32,12 @@ services:
         container_name: notification_backend
         environment:
             CONTAINER_ROLE: backend
+            RUN_SEEDER: "true"
         restart: unless-stopped
         depends_on:
             - pgsql
             - redis
             - kafka
-        volumes:
-            - .:/app
-        networks:
-            - notification_network
-        logging:
-            options:
-                max-size: "10M"
-                max-file: "3"
-
-    queue:
-        build:
-            context: docker/base/backend
-            dockerfile: Dockerfile
-            args:
-                WWWUSER: '${WWWUSER:-1000}'
-                WWWGROUP: '${WWWGROUP:-1000}'
-            target: backend
-        container_name: notification_queue
-        environment:
-            CONTAINER_ROLE: queue
-        restart: unless-stopped
-        depends_on:
-            - backend
-            - kafka
-            - redis
         volumes:
             - .:/app
         networks:
@@ -125,9 +101,36 @@ services:
             KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
             KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
             KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-            KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
         volumes:
-            - kafka_data:/tmp/kraft-combined-logs
+            - kafka_data:/var/lib/kafka/data
+            - ./docker/base/kafka/docker-entrypoint.sh:/docker-entrypoint.sh
+        entrypoint: [ "/bin/bash", "/docker-entrypoint.sh" ]
+        networks:
+            - notification_network
+        logging:
+            options:
+                max-size: "10M"
+                max-file: "3"
+
+    kafka-consumer:
+        build:
+            context: docker/base/backend
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+            target: backend
+        container_name: notification_kafka_consumer
+        environment:
+            CONTAINER_ROLE: kafka-consumer
+        restart: unless-stopped
+        depends_on:
+            - backend
+            - kafka
+            - redis
+            - pgsql
+        volumes:
+            - .:/app
         networks:
             - notification_network
         logging:
