@@ -29,7 +29,7 @@
 ## Запуск проекта
 1. Клонировать репозиторий
 ```
-git clone <repository-url>
+git clone
 
 cd notification-service
 ```
@@ -60,7 +60,7 @@ docker compose ps
 Создание массовой рассылки
 POST /api/batch
 
-Полный URL:
+### Полный URL:
 
 http://localhost:8080/api/batch
 
@@ -169,15 +169,15 @@ docker exec -it notification_backend php artisan test
 ```
 ### Основные тестируемые сценарии:
 
-- идемпотентность batch;
-- публикация сообщений в Kafka topics по приоритету;
-- обработка сообщения Kafka consumer;
-- вызов Email provider;
-- изменение статусов сообщений;
-- retry после ошибки провайдера;
-- перевод сообщения в dropped после 3 попыток;
-- сохранение retry в Redis;
-- backoff retry.
+- идемпотентность batch
+- публикация сообщений в Kafka topics по приоритету
+- обработка сообщения Kafka consumer
+- вызов Email provider
+- изменение статусов сообщений
+- retry после ошибки провайдера
+- перевод сообщения в dropped после 3 попыток
+- сохранение retry в Redis
+- backoff retry
 ## Остановка проекта
 ```
 docker compose down
