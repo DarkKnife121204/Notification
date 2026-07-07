@@ -12,7 +12,7 @@ if [ "$role" = "backend" ]; then
     exec php-fpm --nodaemonize
 
 elif [ "$role" = "kafka-consumer" ]; then
-    php /app/artisan kafka:consume-messages
+    exec php /app/artisan kafka:consume-messages
 
 else
     echo "Could not match the container role: $role"

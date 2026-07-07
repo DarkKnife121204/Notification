@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Priority;
 use App\Models\Batch;
 use App\Repositories\BatchRepository;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,14 @@ class BatchService
         ]));
     }
 
+    private function topicByPriority(string $priority): string
+    {
+        return match ($priority) {
+            Priority::TRANSACTIONAL->value => config('kafka.topics.transactional'),
+            Priority::MARKETING->value => config('kafka.topics.marketing'),
+        };
+    }
+
     public function create(array $data): Batch
     {
         return DB::transaction(function () use ($data) {
@@ -50,10 +59,12 @@ class BatchService
 
             $messages = $this->batchRepository->createMessages($batch, $data);
 
-            DB::afterCommit(function () use ($messages) {
+            $topic = $this->topicByPriority($data['priority']);
+
+            DB::afterCommit(function () use ($messages, $topic) {
                 foreach ($messages as $message) {
                     Kafka::publish()
-                        ->onTopic(config('kafka.topics.notifications'))
+                        ->onTopic($topic)
                         ->withBody([
                             'message_id' => $message->id,
                         ])

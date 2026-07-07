@@ -13,32 +13,45 @@ class KafkaConsumeMessagesCommand extends Command
 {
     protected $signature = 'kafka:consume-messages';
 
-    public function handle(MessageSenderService $sender, DeliveryStatusService $deliveryStatusService): int {
-        Kafka::consumer([config('kafka.topics.notifications')])
-            ->withHandler(function (ConsumerMessage $message) use ($sender, $deliveryStatusService) {
+    public function handle(MessageSenderService $sender, DeliveryStatusService $deliveryStatusService): int
+    {
+        $topic = config('kafka.consumer_topic');
+
+        Kafka::consumer([$topic])
+            ->withHandler(function (ConsumerMessage $message) use ($sender, $deliveryStatusService, $topic) {
                 $body = $message->getBody();
 
+                $this->line('Topic: ' . $topic);
                 $this->line('Body: ' . json_encode($body));
 
                 $messageId = $body['message_id'] ?? null;
 
-                if (! $messageId) {
+                if (!$messageId) {
                     return;
                 }
 
                 try {
                     $isSent = $sender->send((int) $messageId);
 
-                    if (! $isSent) {
+                    if (!$isSent) {
                         return;
                     }
 
                     $deliveryStatusService->markDelivered((int) $messageId);
                 } catch (Throwable $exception) {
-                    $deliveryStatusService->markDropped(
+                    $isDropped = $deliveryStatusService->markFailedOrDropped(
                         (int) $messageId,
                         $exception->getMessage()
                     );
+
+                    if (!$isDropped) {
+                        Kafka::publish()
+                            ->onTopic($topic)
+                            ->withBody([
+                                'message_id' => (int) $messageId,
+                            ])
+                            ->send();
+                    }
                 }
             })
             ->build()

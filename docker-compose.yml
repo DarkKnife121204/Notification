@@ -112,7 +112,7 @@ services:
                 max-size: "10M"
                 max-file: "3"
 
-    kafka-consumer:
+    kafka-consumer-transactional:
         build:
             context: docker/base/backend
             dockerfile: Dockerfile
@@ -120,9 +120,10 @@ services:
                 WWWUSER: '${WWWUSER:-1000}'
                 WWWGROUP: '${WWWGROUP:-1000}'
             target: backend
-        container_name: notification_kafka_consumer
+        container_name: notification_kafka_consumer_transactional
         environment:
             CONTAINER_ROLE: kafka-consumer
+            KAFKA_TOPIC: notifications.transactional
         restart: unless-stopped
         depends_on:
             - backend
@@ -133,10 +134,29 @@ services:
             - .:/app
         networks:
             - notification_network
-        logging:
-            options:
-                max-size: "10M"
-                max-file: "3"
+
+    kafka-consumer-marketing:
+        build:
+            context: docker/base/backend
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+            target: backend
+        container_name: notification_kafka_consumer_marketing
+        environment:
+            CONTAINER_ROLE: kafka-consumer
+            KAFKA_TOPIC: notifications.marketing
+        restart: unless-stopped
+        depends_on:
+            - backend
+            - kafka
+            - redis
+            - pgsql
+        volumes:
+            - .:/app
+        networks:
+            - notification_network
 
     kafka-ui:
         image: provectuslabs/kafka-ui:latest

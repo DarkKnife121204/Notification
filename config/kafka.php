@@ -84,7 +84,10 @@ return [
      */
     'message_id_key' => env('MESSAGE_ID_KEY', 'laravel-kafka::message-id'),
 
+    'consumer_topic' => env('KAFKA_TOPIC'),
+
     'topics' => [
-        'notifications' => env('KAFKA_TOPIC', 'notifications'),
+        'transactional' => env('KAFKA_TOPIC_TRANSACTIONAL', 'notifications.transactional'),
+        'marketing' => env('KAFKA_TOPIC_MARKETING', 'notifications.marketing'),
     ],
 ];

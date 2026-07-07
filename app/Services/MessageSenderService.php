@@ -15,12 +15,12 @@ class MessageSenderService
     {
         $message = Message::with('recipient')->find($messageId);
 
-        if (! $message) {
-            return false;
+        if (!$message) {
+            throw new RuntimeException('Не найдено сообщение');
         }
 
         if (in_array($message->status, [Status::DELIVERED, Status::DROPPED], true)) {
-            return false;
+            throw new RuntimeException('Попытка повторной отправки сообщений');
         }
 
         $message->update([
@@ -33,7 +33,7 @@ class MessageSenderService
             DeliveryChannel::EMAIL => app(EmailProvider::class)->send($message),
         };
 
-        if (! $isSent) {
+        if (!$isSent) {
             throw new RuntimeException('Провайдер не принял сообщение');
         }
 

@@ -7,15 +7,13 @@ use App\Models\Message;
 
 class DeliveryStatusService
 {
+    private const MAX_ATTEMPTS = 3;
+
     public function markDelivered(int $messageId): void
     {
         $message = Message::find($messageId);
 
         if (! $message) {
-            return;
-        }
-
-        if ($message->status !== Status::SENT) {
             return;
         }
 
@@ -26,22 +24,29 @@ class DeliveryStatusService
         ]);
     }
 
-    public function markDropped(int $messageId, string $reason): void
+    public function markFailedOrDropped(int $messageId, string $reason): bool
     {
         $message = Message::find($messageId);
 
-        if (! $message) {
-            return;
+        if (!$message) {
+            return true;
         }
 
-        if (in_array($message->status, [Status::DELIVERED, Status::DROPPED], true)) {
-            return;
+        if ($message->attempts >= self::MAX_ATTEMPTS) {
+            $message->update([
+                'status' => Status::DROPPED,
+                'dropped_at' => now(),
+                'error_message' => $reason,
+            ]);
+
+            return true;
         }
 
         $message->update([
-            'status' => Status::DROPPED,
-            'dropped_at' => now(),
+            'status' => Status::QUEUED,
             'error_message' => $reason,
         ]);
+
+        return false;
     }
 }
