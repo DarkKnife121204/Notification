@@ -10,12 +10,20 @@ class BatchResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            /** Идентификатор рассылки */
             'id' => $this->id,
+            /** Канал доставки уведомлений */
             'channel' => $this->channel,
+            /** Приоритет рассылки */
             'priority' => $this->priority,
+            /** Текст уведомления */
             'message' => $this->message,
+            /** Ключ идемпотентности запроса. */
             'idempotency_key' => $this->idempotency_key,
-            'messages_count' => $this->messages_count ?? $this->messages()->count(),
+            /** Количество созданных сообщений */
+            'messages_count' => $this->messages_count
+                ?? $this->messages()->count(),
+            /** Дата и время создания рассылки */
             'created_at' => $this->created_at,
         ];
     }

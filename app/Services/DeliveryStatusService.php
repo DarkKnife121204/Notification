@@ -13,7 +13,7 @@ class DeliveryStatusService
     {
         $message = Message::find($messageId);
 
-        if (! $message) {
+        if (!$message) {
             return;
         }
 

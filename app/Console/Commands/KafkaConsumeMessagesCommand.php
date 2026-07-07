@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Message;
 use App\Services\DeliveryStatusService;
 use App\Services\MessageSenderService;
+use App\Services\RetryService;
 use Illuminate\Console\Command;
 use Junges\Kafka\Contracts\ConsumerMessage;
 use Junges\Kafka\Facades\Kafka;
@@ -13,12 +15,12 @@ class KafkaConsumeMessagesCommand extends Command
 {
     protected $signature = 'kafka:consume-messages';
 
-    public function handle(MessageSenderService $sender, DeliveryStatusService $deliveryStatusService): int
+    public function handle(MessageSenderService $sender, DeliveryStatusService $deliveryStatusService, RetryService $retryService): int
     {
         $topic = config('kafka.consumer_topic');
 
         Kafka::consumer([$topic])
-            ->withHandler(function (ConsumerMessage $message) use ($sender, $deliveryStatusService, $topic) {
+            ->withHandler(function (ConsumerMessage $message) use ($sender, $deliveryStatusService, $topic, $retryService) {
                 $body = $message->getBody();
 
                 $this->line('Topic: ' . $topic);
@@ -45,12 +47,15 @@ class KafkaConsumeMessagesCommand extends Command
                     );
 
                     if (!$isDropped) {
-                        Kafka::publish()
-                            ->onTopic($topic)
-                            ->withBody([
-                                'message_id' => (int) $messageId,
-                            ])
-                            ->send();
+                        $message = Message::find((int) $messageId);
+
+                        $this->error('Scheduling retry: ' . $message->id);
+
+                        $retryService->schedule(
+                            $message->id,
+                            $topic,
+                            $message->attempts,
+                        );
                     }
                 }
             })

@@ -14,6 +14,9 @@ if [ "$role" = "backend" ]; then
 elif [ "$role" = "kafka-consumer" ]; then
     exec php /app/artisan kafka:consume-messages
 
+elif [ "$role" = "retry-worker" ]; then
+    php /app/artisan retry:process
+
 else
     echo "Could not match the container role: $role"
     exit 1

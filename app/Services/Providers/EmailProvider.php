@@ -14,6 +14,6 @@ class EmailProvider
                 ->subject('Notification');
         });
 
-        return true;
+        return false;
     }
 }

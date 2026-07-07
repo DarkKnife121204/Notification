@@ -176,6 +176,28 @@ services:
                 max-size: "10M"
                 max-file: "3"
 
+    retry-worker:
+        build:
+            context: docker/base/backend
+            dockerfile: Dockerfile
+            args:
+                WWWUSER: '${WWWUSER:-1000}'
+                WWWGROUP: '${WWWGROUP:-1000}'
+            target: backend
+        container_name: notification_retry_worker
+        environment:
+            CONTAINER_ROLE: retry-worker
+        restart: unless-stopped
+        depends_on:
+            - backend
+            - kafka
+            - redis
+            - pgsql
+        volumes:
+            - .:/app
+        networks:
+            - notification_network
+
     mailhog:
         image: mailhog/mailhog
         container_name: notification_mailhog

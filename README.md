@@ -1,58 +1,184 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Notification Service
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Микросервис массовой отправки Email и SMS уведомлений.
 
-## About Laravel
+Сервис поддерживает:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- массовую отправку уведомлений;
+- приоритезацию transactional и marketing сообщений;
+- Kafka для асинхронной обработки;
+- retry с backoff через Redis;
+- идемпотентность запросов;
+- историю изменения статусов сообщений;
+- Email и SMS провайдеры;
+- интеграционные тесты;
+- Swagger/OpenAPI документацию.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Стек
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.4
+- Laravel 12
+- PostgreSQL
+- Apache Kafka
+- Redis
+- Nginx
+- Docker Compose
+- Scramble OpenAPI
+- Mailhog
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+## Запуск проекта
+1. Клонировать репозиторий
 ```
+git clone <repository-url>
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+cd notification-service
+```
+2. Создать .env
+```
+cp .env.example .env
+```
+3. Запустить проект
+```
+docker compose up -d --build
+```
+### Проект запускается одной командой через Docker Compose.
 
-## Contributing
+При старте backend выполняются миграции и seeder.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+4. Проверить контейнеры
+```
+docker compose ps
+```
+## Доступные сервисы
+### Сервис	Адрес
+- API	http://localhost:8080
+- Swagger / OpenAPI	http://localhost:8080/docs/api
+- OpenAPI JSON	http://localhost:8080/docs/api.json
+- Kafka UI	http://localhost:8081
+- Mailhog	http://localhost:8025
+## API
+Создание массовой рассылки
+POST /api/batch
 
-## Code of Conduct
+Полный URL:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+http://localhost:8080/api/batch
 
-## Security Vulnerabilities
+Пример Email-запроса:
+```
+{
+    "channel": "email",
+    "priority": "transactional",
+    "idempotency_key": "notification-email-001",
+    "message": "Test email notification",
+    "recipient_ids": [
+        1,2
+    ]
+}
+```
+Пример SMS-запроса:
+```
+{
+    "channel": "sms",
+    "priority": "marketing",
+    "idempotency_key": "notification-sms-001",
+    "message": "Test SMS notification",
+    "recipient_ids": [
+        1,2
+    ]
+}
+```
+### Пример ответа:
+```
+{
+    "data": {
+        "id": 1,
+        "channel": "email",
+        "priority": "transactional",
+        "message": "Test email notification",
+        "idempotency_key": "notification-email-001",
+        "messages_count": 2,
+        "created_at": "2026-07-07T10:00:00.000000Z"
+    }
+}
+```
+## Получение истории уведомлений получателя
+```
+GET /api/recipients/{external_id}/messages
+```
+### Полный пример:
+```
+http://localhost:8080/api/recipients/1/messages
+```
+### Пример ответа:
+```
+{
+    "data": [
+        {
+            "id": 1,
+            "batch_id": 1,
+            "channel": "email",
+            "priority": "transactional",
+            "status": "delivered",
+            "message": "Test email notification",
+            "attempts": 1,
+            "sent_at": "2026-07-07T10:00:01.000000Z",
+            "delivered_at": "2026-07-07T10:00:01.000000Z",
+            "dropped_at": null,
+            "error_message": null,
+            "logs": [
+                {
+                    "from_status": null,
+                    "to_status": "queued",
+                    "created_at": "2026-07-07T10:00:00.000000Z"
+                },
+                {
+                    "from_status": "queued",
+                    "to_status": "sent",
+                    "created_at": "2026-07-07T10:00:01.000000Z"
+                },
+                {
+                    "from_status": "sent",
+                    "to_status": "delivered",
+                    "created_at": "2026-07-07T10:00:01.000000Z"
+                }
+            ]
+        }
+    ]
+}
+```
+## Статусы сообщений
+- queued — сообщение принято и ожидает отправки
+- sent — сообщение передано провайдеру
+- delivered — доставка подтверждена
+- dropped — сообщение окончательно отброшено после неуспешных попыток
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Приоритезация
 
-## License
+### Используются два Kafka topic:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- notifications.transactional
+- notifications.marketing
+
+Transactional сообщения обрабатываются отдельным consumer и не ожидают завершения marketing рассылок.
+## Тесты
+
+Запуск всех тестов:
+```
+docker exec -it notification_backend php artisan test
+```
+### Основные тестируемые сценарии:
+
+- идемпотентность batch;
+- публикация сообщений в Kafka topics по приоритету;
+- обработка сообщения Kafka consumer;
+- вызов Email provider;
+- изменение статусов сообщений;
+- retry после ошибки провайдера;
+- перевод сообщения в dropped после 3 попыток;
+- сохранение retry в Redis;
+- backoff retry.
+## Остановка проекта
+```
+docker compose down
+```
